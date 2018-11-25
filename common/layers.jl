@@ -37,12 +37,12 @@ mutable struct SoftmaxLayer{T} <: AbstractLayer
     end
 end
 
-function forward(l::Softmax{T}, x::AbstractArray{T}) where {T}
+function forward(l::SoftmaxLayer{T}, x::AbstractArray{T}) where {T}
     l.out = softmax(x)
     l.out
 end
 
-function backward(l::SigmoidLayer{T}, dout::AbstractArray{T}) where {T}
+function backward(l::SoftmaxLayer{T}, dout::AbstractArray{T}) where {T}
     dx = l.out .* dout
     sumdx = vec(sum(dx, dims=2))
     dx = dx .- l.out * sumdx
@@ -66,12 +66,13 @@ function forward(l::SoftmaxWithLossLayer{T}, x::AbstractArray{T}, t::AbstractArr
     return l.loss
 end
 
-@inline _swlvec{T}(y::AbstractArray{T}, t::AbstractVector{T}) = y .- t
-@inline _swlvec{T}(y::AbstractArray{T}, t::AbstractMatrix{T}) = (y .- t) / size(t)[2]
 
 function backward(l::SoftmaxWithLossLayer{T}, dout::T=1.0) where {T}
     dout .* _swlvec(l.y .- l.t)
 end
+@inline _swlvec(y::AbstractArray{T}, t::AbstractVector{T}) where {T} = y .- t
+@inline _swlvec(y::AbstractArray{T}, t::AbstractMatrix{T}) where {T} = (y .- t) / size(t)[2]
+
 
 mutable struct AffineLayer{T} <: AbstractLayer
     W::AbstractMatrix{T}

@@ -34,17 +34,17 @@ function cross_entropy_error(y::Matrix, t::Vector)
 end
 
 
-x1 = [1 2 3]
-x2 = [1 2 3;4 5 6]
-println(x1)
-println(softmax(x1))
-println(x2)
-println(softmax(x2))
-
-xo = randn(10)
-println(xo)
-println(relu(xo))
-
-
-y = [1 2 3 4 5 6]
-t = [1 2 3 1 2 3]
+# x1 = [1 2 3]
+# x2 = [1 2 3;4 5 6]
+# println(x1)
+# println(softmax(x1))
+# println(x2)
+# println(softmax(x2))
+#
+# xo = randn(10)
+# println(xo)
+# println(relu(xo))
+#
+#
+# y = [1 2 3 4 5 6]
+# t = [1 2 3 1 2 3]
