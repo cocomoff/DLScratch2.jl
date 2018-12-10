@@ -8,12 +8,13 @@ include("functions.jl")
 abstract type AbstractLayer
 end
 
-
 export SigmoidLayer, AffineLayer, TwoLayerNet, MatMulLayer, SoftmaxLayer, SoftmaxWithLossLayer
 export forward
 export backward
 export predict
 export loss
+export gradient
+export applygradient!
 
 mutable struct SigmoidLayer{T} <: AbstractLayer
     out::AbstractArray{T}
@@ -23,7 +24,7 @@ mutable struct SigmoidLayer{T} <: AbstractLayer
 end
 
 function forward(l::SigmoidLayer{T}, x::AbstractArray{T}) where {T}
-    l.out = 1 ./ 1 .+ exp.(-x)
+    l.out = 1 ./ (1 .+ exp.(-x))
     l.out
 end
 
@@ -69,11 +70,11 @@ end
 
 
 function backward(l::SoftmaxWithLossLayer{T}, dout::T=1.0) where {T}
-    dout .* _swlvec(l.y .- l.t)
+    dx = copy(l.y)
+    dout .* _swlvec(l.y, l.t)
 end
 @inline _swlvec(y::AbstractArray{T}, t::AbstractVector{T}) where {T} = y .- t
-@inline _swlvec(y::AbstractArray{T}, t::AbstractMatrix{T}) where {T} = (y .- t) / size(t)[2]
-
+@inline _swlvec(y::AbstractArray{T}, t::AbstractMatrix{T}) where {T} = (y .- t) / size(t)[1]
 
 mutable struct AffineLayer{T} <: AbstractLayer
     W::AbstractMatrix{T}
@@ -98,8 +99,8 @@ end
 
 function backward(l::AffineLayer{T}, dout::AbstractArray{T}) where {T}
     dx = dout * l.W'
-    dW = dout * l.x'
-    db = vec(sum(dout, dims=2))
+    dW = l.x' * dout
+    db = vec(sum(dout, dims=1))
     l.dW .= dW
     l.db .= db
     dx
@@ -113,10 +114,14 @@ mutable struct TwoLayerNet{T}
 end
 
 function (::Type{TwoLayerNet{T}})(isize::Int, hsize::Int, osize::Int;
-        weight_init_std::Float64=0.01) where {T}
-    W1 = weight_init_std * randn(T, hsize, isize)
+        weight_init_std::Float64=1.0) where {T}
+#     W1 = weight_init_std * randn(T, isize, hsize)
+#     b1 = randn(T, hsize)
+#     W2 = weight_init_std * randn(T, hsize, osize)
+#     b2 = randn(T, osize)
+    W1 = zeros(T, isize, hsize)
     b1 = zeros(T, hsize)
-    W2 = weight_init_std * randn(T, osize, hsize)
+    W2 = zeros(T, hsize, osize)
     b2 = zeros(T, osize)
     a1l = AffineLayer(W1, b1)
     sig = SigmoidLayer{T}()
@@ -132,9 +137,10 @@ function predict(net::TwoLayerNet{T}, x::AbstractArray{T}) where {T}
     a2
 end
 
-function loss(net::TwoLayerNet{T}, x::AbstractArray{T}, t::AbstractArray{T}) where {T}
+function forward(net::TwoLayerNet{T}, x::AbstractArray{T}, t::AbstractArray{T}) where {T}
     y = predict(net, x)
-    forward(net.loss, y, t)
+    loss = forward(net.loss, y, t)
+    return loss
 end
 
 struct TwoLayerNetGrads{T}
@@ -146,7 +152,8 @@ end
 
 function gradient(net::TwoLayerNet{T}, x::AbstractArray{T}, t::AbstractArray{T}) where {T}
     # forward
-    loss(net, x, t)
+    yf = forward(net, x, t)
+    # println(yf)
 
     # backward
     dout = one(T)
@@ -154,15 +161,23 @@ function gradient(net::TwoLayerNet{T}, x::AbstractArray{T}, t::AbstractArray{T})
     da2 = backward(net.a2l, dz2)
     dz1 = backward(net.sig, da2)
     da1 = backward(net.a1l, dz1)
-    TwoLayerNetGrads(net.a1l.dW, net.a1l.db, net.a2l.dW, net.a2l.db)
+    yf, TwoLayerNetGrads(net.a1l.dW, net.a1l.db, net.a2l.dW, net.a2l.db)
 end
 
+function one_hot(x::Array{Float64, 1}; num=3)
+    ans = zeros(size(x)[1], num)
+    for i in 1:size(x)[1]
+        idx = Int(x[i]) + 1
+        ans[i, idx] = 1
+    end
+    return ans
+end
 
 function applygradient!(net::TwoLayerNet{T}, grads::TwoLayerNetGrads{T}, learning_rate::T) where {T}
-    net.a1lyr.W -= learning_rate .* grads.W1
-    net.a1lyr.b -= learning_rate .* grads.b1
-    net.a2lyr.W -= learning_rate .* grads.W2
-    net.a2lyr.b -= learning_rate .* grads.b2
+    net.a1l.W -= learning_rate .* grads.W1
+    net.a1l.b -= learning_rate .* grads.b1
+    net.a2l.W -= learning_rate .* grads.W2
+    net.a2l.b -= learning_rate .* grads.b2
 end
 
 mutable struct MatMulLayer{T} <: AbstractLayer
@@ -189,8 +204,6 @@ function backward(l::MatMulLayer{T}, dout::AbstractArray{T}) where {T}
     l.dW .= dW
     dx
 end
-
-
 
 
 end

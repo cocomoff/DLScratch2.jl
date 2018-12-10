@@ -1,50 +1,37 @@
 using LinearAlgebra
 
-sigmoid(x) = 1 ./ (1 .+ exp.(-x))
+sigmoid(x) = 1.0 ./ (1.0 .+ exp.(-x))
 
 relu(x) = max.(0, x)
 
 function softmax(x)
-    if size(x)[1] == 2
+    if ndims(x) == 2
         x = x .- maximum(x, dims=2)
         x = exp.(x)
         x = x ./ sum(x, dims=2)
-    elseif size(x)[1] == 1
+    elseif ndims(x) == 1
         x = x .- maximum(x, dims=2)
         x = exp.(x) ./ sum(exp.(x))
     end
     return x
 end
 
+
 function cross_entropy_error(y::Vector, t::Vector)
     δ = 1e-7
-    -(t ⋅ log(y .+ δ))
+    -t ⋅ log.(y .+ δ)
 end
 
 function cross_entropy_error(y::Matrix, t::Matrix)
-    batch_size = size(y, 2)
+    batch_size = size(y, 1)
     δ = 1e-7
-    -vecdot(t, log(y .+ δ))
+    _, idx = findmax(t, dims=2)
+    nt = reshape(Int.(t[idx]), (batch_size))
+    return cross_entropy_error(y, nt)
 end
 
 function cross_entropy_error(y::Matrix, t::Vector)
-    batch_size = size(y, 2)
+    batch_size = size(y, 1)
     δ = 1e-7
-    -sum([log(y[t[i] + 1, i]) for i = 1:batch_size] .+ δ) / batch_size
+    -sum([log(y[i, t[i]]) for i = 1:batch_size] .+ δ) / batch_size
 end
-
-
-# x1 = [1 2 3]
-# x2 = [1 2 3;4 5 6]
-# println(x1)
-# println(softmax(x1))
-# println(x2)
-# println(softmax(x2))
-#
-# xo = randn(10)
-# println(xo)
-# println(relu(xo))
-#
-#
-# y = [1 2 3 4 5 6]
-# t = [1 2 3 1 2 3]
